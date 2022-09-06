@@ -9,9 +9,9 @@
 
 /*
     To Do:
-  Save habit data to eeprom
   OLED saver code
   Valid time check on button input
+  Make data available on web server
 */
 
 #include <WiFi.h>
@@ -20,6 +20,7 @@
 #include "WiFiSettings.h"
 #include <Wire.h>
 #include <SSD1306Wire.h>
+#include <Preferences.h>
 
 #ifndef STASSID
 #define STASSID "your-ssid"
@@ -33,6 +34,7 @@
 #define ONE_DAY 86400
 
 SSD1306Wire display(0x3c, SDA, SCL);
+Preferences preferences;
 
 const char* timeZone = "EST5EDT,M3.2.0,M11.1.0";
 const char* ntpServer1 = "pool.ntp.org";
@@ -68,8 +70,6 @@ void setup() {
 
   configTzTime(timeZone, ntpServer1, ntpServer2);
 
-  // load habit data from eeprom
-
   display.init();
   display.flipScreenVertically();
 
@@ -81,6 +81,15 @@ void setup() {
   display.drawString(0, 12, "Initiating RTC");
   display.display();
   while (!getLocalTime(&timeInfo)) { delay(10); }
+
+  display.drawString(0, 12, "Loading data");
+  display.display();
+  if (!preferences.begin("habitData")) {
+    display.drawString(0, 24, "ERROR LOADING DATA");
+    display.display();
+    delay(300000);
+  }
+  loadHabitData();
   
   displayHabitData();
 }
@@ -94,13 +103,13 @@ void loop() {
   int month = timeInfo.tm_mon;
   int day = timeInfo.tm_mday - 1;
   if (buttonState == HIGH && habitData[month][day] == false) {
-    habitData[month][day] = true;
-    displayHabitData();
+    updateHabitData(month, day, true);
   }
 
   digitalWrite(LED, buttonState); // test code
 }
 
+// Draws habit data to the display
 void displayHabitData() {
   display.clear();
 
@@ -139,6 +148,7 @@ void displayHabitData() {
   display.display();
 }
 
+// Debounces button input
 void checkButton() {
   int buttonReading = digitalRead(BUTTON);
   if (buttonReading != lastButtonState) {
@@ -152,41 +162,90 @@ void checkButton() {
   lastButtonState = buttonReading;
 }
 
+// Updates the RTC
 void checkTime() {
   if ((millis() - lastTimeCheck) > TIME_CHECK_FREQUENCY) {
     lastTimeCheck = millis();
-    if (!getLocalTime(&timeInfo)){
-      Serial.println("No time available (yet)");
-      return;
-    }
-    // Serial.println(&timeInfo, "%A, %B %d %Y %H:%M:%S");
-    // serialOutHabitData();
+    getLocalTime(&timeInfo);
   }
 }
 
+// Use this function to make changes to habit data
+// Only this function and loadHabitData should modify the habitData object
+void updateHabitData(int month, int day, bool status) {
+  habitData[month][day] = status;
+  saveHabitData(month, day, status);
+  displayHabitData();
+}
+
+//
+// Preferences functions
+//
+
+// Loads habitData from Preferences
+void loadHabitData() {
+  char key[6];
+  for (int month = 0; month < 12; month++) {
+    for (int day = 0; day < 31; day++) {
+      snprintf(key, 6, "%d-%d", month, day);
+      habitData[month][day] = preferences.getBool(key);
+    }
+  }
+}
+
+// Saves habitData from Preferences
+void saveHabitData(int month, int day, bool status) {
+  char key[6];
+  snprintf(key, 6, "%d-%d", month, day);
+  preferences.putBool(key, status);
+}
+
+//
+// Test functions
+//
+
+// Test function - checks habitData variable against Preferences
+bool checkHabitData() {
+  char key[6];
+  for (int month = 0; month < 12; month++) {
+    for (int day = 0; day < 31; day++) {
+      snprintf(key, 6, "%d-%d", month, day);
+      if (habitData[month][day] != preferences.getBool(key)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Test function - outputs habitData over serial
 void serialOutHabitData() {
-  for (int i = 0; i < 12; i++) {
+  for (int month = 0; month < 12; month++) {
     char monthString[32] = "";
-    for (int j = 0; j < 31; j++) {
-      strlcat(monthString, habitData[i][j] ? "1" : "0", 32);
+    for (int day = 0; day < 31; day++) {
+      strlcat(monthString, habitData[month][day] ? "1" : "0", 32);
     }
     Serial.println(monthString);
   }
   Serial.println("-------------------------------");
 }
 
+// Test function - allows modifying habitData over serial
 void serialInHabitData() {
   while (Serial.available() > 0) {
     int month = Serial.parseInt();
     int day = Serial.parseInt();
     if (Serial.read() == '\n') {
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        habitData[month-1][day-1] = !habitData[month-1][day-1];
-        displayHabitData();
-      } else if (month == -1 && day == 1) {
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) { // m d : Toggle habit data for given day
+        updateHabitData(month-1, day-1, !habitData[month-1][day-1]);
+      } else if (month == -1 && day == 1) { // -1 1 : Output habit data over serial
         serialOutHabitData();
-      } else if (month == -1 && day == 0) {
+      } else if (month == -1 && day == 2) { // -1 2 : Check habitData variable against Preferences
+        Serial.println("Checking habit data...");
+        Serial.println(checkHabitData() ? "Passed" : "Failed");
+      } else if (month == -1 && day == 0) { // -1 0 : Clears all data (habitData and Preferences)
         memset(habitData, 0, sizeof(habitData));
+        preferences.clear();
         displayHabitData();
       }
     }

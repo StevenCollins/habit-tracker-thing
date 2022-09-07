@@ -9,7 +9,6 @@
 
 /*
     To Do:
-  OLED saver code
   Valid time check on button input
   Make data available on web server
 */
@@ -29,6 +28,7 @@
 
 #define LED 5
 #define BUTTON 23
+#define BRIGHTNESS 32
 #define DEBOUNCE_DELAY 50
 #define TIME_CHECK_FREQUENCY 1000
 #define ONE_DAY 86400
@@ -49,6 +49,12 @@ const int border = 1; // Space to edge of screen
 const int columnSpace = 3; // Space between columns
 const int weekSize = 8; // Size of each week box
 const int weekSpace = 1; // Space between week boxes
+
+const int oledMaxShift = 10; // Maximum number of pixels to shift display
+const int oledShiftPeriod = 60000; // How long between shifts (in ms)
+unsigned long oledLastShiftTime = 0; // Time of last shift
+bool oledShiftDirection = true;  // Which direction we're currently shifting (true is right)
+int oledShiftAmount = 0; // Current shift amount
 
 int ledState = HIGH;
 
@@ -71,6 +77,7 @@ void setup() {
   configTzTime(timeZone, ntpServer1, ntpServer2);
 
   display.init();
+  display.setBrightness(BRIGHTNESS);
   display.flipScreenVertically();
 
   WiFi.begin(ssid, password);
@@ -97,6 +104,7 @@ void setup() {
 void loop() {
   checkTime();
   checkButton();
+  oledPixelShiftUpdate();
   serialInHabitData();
 
   // Handle habit tracked!
@@ -117,7 +125,7 @@ void displayHabitData() {
   for (int month = 0; month < 12; month++) {
     for (int day = 0; day < 31; day++) {
       if (habitData[month][day]) {
-        int x = month * (width + columnSpace) + border;
+        int x = month * (width + columnSpace) + border + oledShiftAmount;
         int y = day * height + border;
         display.fillRect(x, y, width, height);
       }
@@ -126,7 +134,7 @@ void displayHabitData() {
 
   // Draw week data
   time_t presentTime = time(NULL); // Get timestamp of current time
-  int x = 12 * (width + columnSpace) + border; // All week data is at same x
+  int x = 12 * (width + columnSpace) + border + oledShiftAmount; // All week data is at same x
   for (int dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
     int y = dayOfWeek * (weekSize + weekSpace) + border;
     if (dayOfWeek < timeInfo.tm_wday) { // Days before today should be checked
@@ -168,6 +176,18 @@ void checkTime() {
     lastTimeCheck = millis();
     getLocalTime(&timeInfo);
   }
+}
+
+// Periodically shifts pixels to save the OLED screen
+void oledPixelShiftUpdate() {
+  if ((millis() - oledLastShiftTime) > oledShiftPeriod) {
+    oledLastShiftTime = millis();
+    oledShiftAmount += oledShiftDirection ? 1 : -1;
+    if (oledShiftAmount >= oledMaxShift || oledShiftAmount <= 0) {
+      oledShiftDirection = !oledShiftDirection;
+    }
+  }
+  displayHabitData();
 }
 
 // Use this function to make changes to habit data

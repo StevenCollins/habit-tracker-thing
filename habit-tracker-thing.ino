@@ -9,8 +9,12 @@
 
 /*
     To Do:
-  Valid time check on button input
   Make data available on web server
+  Allow updating valid time on web server
+  Store valid time in preferences
+  Make current date more visible on "calendar"
+  Make end of month visible on "calendar"
+    Make background? Unchecked days will cover background making month ends visible
 */
 
 #include <WiFi.h>
@@ -28,9 +32,6 @@
 
 #define LED 5
 #define BUTTON 23
-#define BRIGHTNESS 32
-#define DEBOUNCE_DELAY 50
-#define TIME_CHECK_FREQUENCY 1000
 #define ONE_DAY 86400
 
 SSD1306Wire display(0x3c, SDA, SCL);
@@ -50,20 +51,26 @@ const int columnSpace = 3; // Space between columns
 const int weekSize = 8; // Size of each week box
 const int weekSpace = 1; // Space between week boxes
 
+const int oledBrightness = 32; // Brightness (0-255)
 const int oledMaxShift = 10; // Maximum number of pixels to shift display
 const int oledShiftPeriod = 60000; // How long between shifts (in ms)
 unsigned long oledLastShiftTime = 0; // Time of last shift
 bool oledShiftDirection = true;  // Which direction we're currently shifting (true is right)
 int oledShiftAmount = 0; // Current shift amount
 
-int ledState = HIGH;
-
-int buttonState;
-int lastButtonState = LOW;
+const int debounceDelay = 50;
 unsigned long lastDebounceTime = 0;
+int lastButtonState = LOW;
+int buttonState;
+bool buttonActive = true;
 
-struct tm timeInfo;
+const int timeCheckPeriod = 1000;
 unsigned long lastTimeCheck = 0;
+struct tm timeInfo;
+int validTimeStartHour = 6;
+int validTimeStartMinute = 0;
+int validTimeEndHour = 9;
+int validTimeEndMinute = 30;
 
 bool habitData[12][31];
 
@@ -72,12 +79,12 @@ void setup() {
 
   pinMode(BUTTON, INPUT_PULLUP);
   pinMode(LED, OUTPUT);
-  digitalWrite(LED, ledState);
+  digitalWrite(LED, buttonActive); // LED and button status must start the same
 
   configTzTime(timeZone, ntpServer1, ntpServer2);
 
   display.init();
-  display.setBrightness(BRIGHTNESS);
+  display.setBrightness(oledBrightness);
   display.flipScreenVertically();
 
   WiFi.begin(ssid, password);
@@ -102,7 +109,8 @@ void setup() {
 }
 
 void loop() {
-  checkTime();
+  updateRTC();
+  updateButtonStatus();
   checkButton();
   oledPixelShiftUpdate();
   serialInHabitData();
@@ -110,11 +118,9 @@ void loop() {
   // Handle habit tracked!
   int month = timeInfo.tm_mon;
   int day = timeInfo.tm_mday - 1;
-  if (buttonState == HIGH && habitData[month][day] == false) {
+  if (buttonState == HIGH && buttonActive) {
     updateHabitData(month, day, true);
   }
-
-  digitalWrite(LED, buttonState); // test code
 }
 
 // Draws habit data to the display
@@ -162,7 +168,7 @@ void checkButton() {
   if (buttonReading != lastButtonState) {
       lastDebounceTime = millis();
   }
-  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY) {
+  if ((millis() - lastDebounceTime) > debounceDelay) {
     if (buttonReading != buttonState) {
         buttonState = buttonReading;
     }
@@ -171,11 +177,29 @@ void checkButton() {
 }
 
 // Updates the RTC
-void checkTime() {
-  if ((millis() - lastTimeCheck) > TIME_CHECK_FREQUENCY) {
+void updateRTC() {
+  if ((millis() - lastTimeCheck) > timeCheckPeriod) {
     lastTimeCheck = millis();
     getLocalTime(&timeInfo);
   }
+}
+
+// Activiates or deactivates the button based on current status, time, and habit data
+void updateButtonStatus() {
+  if (!buttonActive && !habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] && isTimeValid()) {
+    // Button is not active and should be (habit not tracked and valid time)
+    buttonActive = true;
+    digitalWrite(LED, HIGH);
+  } else if (buttonActive && (habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] || !isTimeValid())) {
+    // Button is active and should not be (habit tracked or invalid time)
+    buttonActive = false;
+    digitalWrite(LED, LOW);
+  }
+}
+
+bool isTimeValid() {
+  return timeInfo.tm_hour >= validTimeStartHour && timeInfo.tm_min >= validTimeStartMinute
+      && timeInfo.tm_hour <= validTimeEndHour && timeInfo.tm_min <= validTimeEndMinute;
 }
 
 // Periodically shifts pixels to save the OLED screen

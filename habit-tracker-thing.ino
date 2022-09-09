@@ -12,9 +12,12 @@
   Make data available on web server
   Allow updating valid time on web server
   Store valid time in preferences
+  Stripe days on "calendar" to make individual days more visible?
+  Make pushing button when not active show why it's not active?
   Make current date more visible on "calendar"
   Make end of month visible on "calendar"
     Make background? Unchecked days will cover background making month ends visible
+  Allow inputting the habit to be tracked and other notes through the webserver
 */
 
 #include <WiFi.h>
@@ -71,6 +74,8 @@ int validTimeStartHour = 6;
 int validTimeStartMinute = 0;
 int validTimeEndHour = 9;
 int validTimeEndMinute = 30;
+int validTimeStart() { return validTimeStartHour * 60 + validTimeStartMinute; } // Start time in minutes past midnight
+int validTimeEnd() { return validTimeEndHour * 60 + validTimeEndMinute; } // End time in minutes past midnight
 
 bool habitData[12][31];
 
@@ -186,20 +191,18 @@ void updateRTC() {
 
 // Activiates or deactivates the button based on current status, time, and habit data
 void updateButtonStatus() {
-  if (!buttonActive && !habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] && isTimeValid()) {
+  int currentMinutesPastMidnight = timeInfo.tm_hour * 60 + timeInfo.tm_min;
+  bool timeValid = currentMinutesPastMidnight >= validTimeStart() && currentMinutesPastMidnight <= validTimeEnd();
+
+  if (!buttonActive && !habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] && timeValid) {
     // Button is not active and should be (habit not tracked and valid time)
     buttonActive = true;
     digitalWrite(LED, HIGH);
-  } else if (buttonActive && (habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] || !isTimeValid())) {
+  } else if (buttonActive && (habitData[timeInfo.tm_mon][timeInfo.tm_mday - 1] || !timeValid)) {
     // Button is active and should not be (habit tracked or invalid time)
     buttonActive = false;
     digitalWrite(LED, LOW);
   }
-}
-
-bool isTimeValid() {
-  return timeInfo.tm_hour >= validTimeStartHour && timeInfo.tm_min >= validTimeStartMinute
-      && timeInfo.tm_hour <= validTimeEndHour && timeInfo.tm_min <= validTimeEndMinute;
 }
 
 // Periodically shifts pixels to save the OLED screen
@@ -287,6 +290,15 @@ void serialInHabitData() {
       } else if (month == -1 && day == 2) { // -1 2 : Check habitData variable against Preferences
         Serial.println("Checking habit data...");
         Serial.println(checkHabitData() ? "Passed" : "Failed");
+      } else if (month == -1 && day == 3) { // -1 3 : Output current IP address and time
+        Serial.println(WiFi.localIP());
+        Serial.println(&timeInfo, "%A, %B %d %Y %H:%M:%S");
+        Serial.print("Start/End/Current MPM: ");
+        Serial.print(validTimeStart());
+        Serial.print("/");
+        Serial.print(validTimeEnd());
+        Serial.print("/");
+        Serial.println(timeInfo.tm_hour * 60 + timeInfo.tm_min);
       } else if (month == -1 && day == 0) { // -1 0 : Clears all data (habitData and Preferences)
         memset(habitData, 0, sizeof(habitData));
         preferences.clear();

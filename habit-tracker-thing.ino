@@ -3,21 +3,17 @@
   I2C Pins: D21 (SDA) / D22 (SCL)
   Screen API: https://github.com/ThingPulse/esp8266-oled-ssd1306
   Time Docs: https://github.com/Patapom/Arduino/blob/master/Libraries/AVR%20Libc/avr-libc-2.0.0/include/time.h
-
-  Proposed screen layout is in screen-reference.png
+  Screen layout: ./screen-reference.png
 */
 
 /*
     To Do:
   Make data available on web server
   Allow updating valid time on web server
-  Store valid time in preferences
-  Stripe days on "calendar" to make individual days more visible?
-  Make pushing button when not active show why it's not active?
-  Make current date more visible on "calendar"
-  Make end of month visible on "calendar"
-    Make background? Unchecked days will cover background making month ends visible
   Allow inputting the habit to be tracked and other notes through the webserver
+  Store valid time in preferences
+  Make end of month visible on "calendar" using (animated?) background
+    Unchecked days will cover background making month ends visible
 */
 
 #include <WiFi.h>
@@ -60,6 +56,7 @@ const int oledShiftPeriod = 60000; // How long between shifts (in ms)
 unsigned long oledLastShiftTime = 0; // Time of last shift
 bool oledShiftDirection = true;  // Which direction we're currently shifting (true is right)
 int oledShiftAmount = 0; // Current shift amount
+bool oledShiftY = false; // Shifts Y by 1
 
 const int debounceDelay = 50;
 unsigned long lastDebounceTime = 0;
@@ -135,10 +132,22 @@ void displayHabitData() {
   // Draw year data
   for (int month = 0; month < 12; month++) {
     for (int day = 0; day < 31; day++) {
-      if (habitData[month][day]) {
+      if (month == timeInfo.tm_mon && day == timeInfo.tm_mday - 1) {
         int x = month * (width + columnSpace) + border + oledShiftAmount;
-        int y = day * height + border;
-        display.fillRect(x, y, width, height);
+        int y = day * height + border + (oledShiftY ? 1 : 0);
+        if (habitData[month][day]) {
+          display.setPixel(x, y);
+          display.setPixel(x + 2, y);
+          display.setPixel(x + 3, y);
+          display.setPixel(x + 5, y);
+        } else {
+          display.setPixel(x + 1, y);
+          display.setPixel(x + 4, y);
+        }
+      } else if (habitData[month][day]) {
+        int x = month * (width + columnSpace) + border + oledShiftAmount;
+        int y = day * height + border + (oledShiftY ? 1 : 0);
+        display.fillRect(x, y, width, height - 1);
       }
     }
   }
@@ -147,7 +156,7 @@ void displayHabitData() {
   time_t presentTime = time(NULL); // Get timestamp of current time
   int x = 12 * (width + columnSpace) + border + oledShiftAmount; // All week data is at same x
   for (int dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-    int y = dayOfWeek * (weekSize + weekSpace) + border;
+    int y = dayOfWeek * (weekSize + weekSpace) + border + (oledShiftY ? 1 : 0);
     if (dayOfWeek < timeInfo.tm_wday) { // Days before today should be checked
       time_t pastTime = presentTime - ((timeInfo.tm_wday - dayOfWeek) * ONE_DAY); // Create timestamp of date to be checked
       struct tm pastTimeInfo;
@@ -210,8 +219,11 @@ void oledPixelShiftUpdate() {
   if ((millis() - oledLastShiftTime) > oledShiftPeriod) {
     oledLastShiftTime = millis();
     oledShiftAmount += oledShiftDirection ? 1 : -1;
-    if (oledShiftAmount >= oledMaxShift || oledShiftAmount <= 0) {
+    if (oledShiftAmount >= oledMaxShift) {
       oledShiftDirection = !oledShiftDirection;
+    } else if (oledShiftAmount <= 0) {
+      oledShiftDirection = !oledShiftDirection;
+      oledShiftY = !oledShiftY;
     }
   }
   displayHabitData();

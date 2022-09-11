@@ -1,6 +1,5 @@
 /*
   Board: DOIT ESP32 DEVKIT V1
-  I2C Pins: D21 (SDA) / D22 (SCL)
   Screen API: https://github.com/ThingPulse/esp8266-oled-ssd1306
   Time Docs: https://github.com/Patapom/Arduino/blob/master/Libraries/AVR%20Libc/avr-libc-2.0.0/include/time.h
   Screen layout: ./screen-reference.png
@@ -29,8 +28,10 @@
 #define STAPSK  "your-password"
 #endif
 
-#define LED 5
-#define BUTTON 23
+#define SDA 14
+#define SCL 27
+#define LED 26
+#define BUTTON 25
 #define ONE_DAY 86400
 
 SSD1306Wire display(0x3c, SDA, SCL);
@@ -178,7 +179,7 @@ void displayHabitData() {
 
 // Debounces button input
 void checkButton() {
-  int buttonReading = digitalRead(BUTTON);
+  int buttonReading = !digitalRead(BUTTON);
   if (buttonReading != lastButtonState) {
       lastDebounceTime = millis();
   }

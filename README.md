@@ -9,4 +9,4 @@ Optionally, the button can be made active only within a certain period so if the
 
 The habit tracker thing is connected to WiFi for the time. WiFi credentials can be added in the main `habit-tracker-thing.ino` file or in `WiFiSettings.h`.
 
-To build the habit tracker thing you'll need an ESP32, a SSD1306 display, a button, an LED, and a resistor. To fully complete the project you'll also need some soldering skills and a 3D printer. Files for the enclosure are available in `3mf/`.
+To build the habit tracker thing you'll need an ESP32, a SSD1306 display, a button, an LED, and a resistor. To fully complete the project you'll also need some soldering skills and a 3D printer. Files for the enclosure are available on [Printables](https://www.printables.com/model/274829-habit-tracker-thing-enclosure).

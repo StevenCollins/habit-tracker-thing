@@ -64,6 +64,7 @@ unsigned long lastDebounceTime = 0;
 int lastButtonState = LOW;
 int buttonState;
 bool buttonActive = true;
+bool trackButtonState = false;
 
 const int timeCheckPeriod = 1000;
 unsigned long lastTimeCheck = 0;
@@ -181,11 +182,19 @@ void displayHabitData() {
 void checkButton() {
   int buttonReading = !digitalRead(BUTTON);
   if (buttonReading != lastButtonState) {
+      if (trackButtonState) {
+        Serial.print("Button reading changed: ");
+        Serial.println(buttonState ? "Pressed" : "Not pressed");
+      }
       lastDebounceTime = millis();
   }
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (buttonReading != buttonState) {
         buttonState = buttonReading;
+        if (trackButtonState) {
+          Serial.print("Button status changed: ");
+          Serial.println(buttonState ? "Pressed" : "Not pressed");
+        }
     }
   }
   lastButtonState = buttonReading;
@@ -312,6 +321,10 @@ void serialInHabitData() {
         Serial.print(validTimeEnd());
         Serial.print("/");
         Serial.println(timeInfo.tm_hour * 60 + timeInfo.tm_min);
+      } else if (month == -1 && day == 4) { // -1 4 : Output current button status and toggle status change output
+        Serial.print("Button status: ");
+        Serial.println(buttonState ? "Pressed" : "Not pressed");
+        trackButtonState = !trackButtonState;
       } else if (month == -1 && day == 0) { // -1 0 : Clears all data (habitData and Preferences)
         memset(habitData, 0, sizeof(habitData));
         preferences.clear();

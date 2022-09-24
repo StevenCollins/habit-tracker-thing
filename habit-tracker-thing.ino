@@ -134,19 +134,7 @@ void displayHabitData() {
   // Draw year data
   for (int month = 0; month < 12; month++) {
     for (int day = 0; day < 31; day++) {
-      if (month == timeInfo.tm_mon && day == timeInfo.tm_mday - 1) {
-        int x = month * (width + columnSpace) + border + oledShiftAmount;
-        int y = day * height + border + (oledShiftY ? 1 : 0);
-        if (habitData[month][day]) {
-          display.setPixel(x, y);
-          display.setPixel(x + 2, y);
-          display.setPixel(x + 3, y);
-          display.setPixel(x + 5, y);
-        } else {
-          display.setPixel(x + 1, y);
-          display.setPixel(x + 4, y);
-        }
-      } else if (habitData[month][day]) {
+      if (habitData[month][day]) {
         int x = month * (width + columnSpace) + border + oledShiftAmount;
         int y = day * height + border + (oledShiftY ? 1 : 0);
         display.fillRect(x, y, width, height - 1);
@@ -174,6 +162,14 @@ void displayHabitData() {
       display.drawRect(x, y, weekSize, weekSize);
     }
   }
+  
+  // Mark today
+  int xToday = timeInfo.tm_mon * (width + columnSpace) + border + oledShiftAmount;
+  int yToday = (timeInfo.tm_mday - 1) * height + border + (oledShiftY ? 1 : 0);
+  display.setPixel(xToday - 1, yToday);
+  display.fillRect(xToday - 2, yToday - 1, 1, 3);
+  display.setPixel(xToday + 6, yToday);
+  display.fillRect(xToday + 7, yToday - 1, 1, 3);
 
   display.display();
 }

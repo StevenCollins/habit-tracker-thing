@@ -1,6 +1,6 @@
 /*
   Board: DOIT ESP32 DEVKIT V1
-  Screen API: https://github.com/ThingPulse/esp8266-oled-ssd1306
+  Screen API: https://github.com/ThingPulse/esp8266-oled-ssd1306 "ESP8266 and ESP32 Oled Driver for SSD1306 display"
   Time Docs: https://github.com/Patapom/Arduino/blob/master/Libraries/AVR%20Libc/avr-libc-2.0.0/include/time.h
   Screen layout: ./screen-reference.png
 */
@@ -17,7 +17,7 @@
 
 #include <WiFi.h>
 #include <time.h>
-#include <sntp.h>
+#include <esp_sntp.h>
 #include "WiFiSettings.h"
 #include <Wire.h>
 #include <SSD1306Wire.h>

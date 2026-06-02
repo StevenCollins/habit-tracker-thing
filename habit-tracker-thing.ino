@@ -20,7 +20,7 @@
 #include <esp_sntp.h>
 #include "WiFiSettings.h"
 #include <Wire.h>
-#include <SSD1306Wire.h>
+#include <SSD1306Wire.h> // From https://github.com/ThingPulse/esp8266-oled-ssd1306
 #include <Preferences.h>
 
 #ifndef STASSID
@@ -69,10 +69,12 @@ bool trackButtonState = false;
 const int timeCheckPeriod = 1000;
 unsigned long lastTimeCheck = 0;
 struct tm timeInfo;
-int validTimeStartHour = 6;
-int validTimeStartMinute = 0;
-int validTimeEndHour = 9;
-int validTimeEndMinute = 30;
+/* Set active button time here */
+int validTimeStartHour = 6; // The hour to allow activating the button, 0 is midnight, up to 23 for 11pm
+int validTimeStartMinute = 0; // The minute to allow activating the button
+int validTimeEndHour = 9; // The hour to disable the button
+int validTimeEndMinute = 30; // The minute to disable the button
+/* Set active button time here */
 int validTimeStart() { return validTimeStartHour * 60 + validTimeStartMinute; } // Start time in minutes past midnight
 int validTimeEnd() { return validTimeEndHour * 60 + validTimeEndMinute; } // End time in minutes past midnight
 
